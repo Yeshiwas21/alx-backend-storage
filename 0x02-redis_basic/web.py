@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Implementing an expiring web cache and tracker
-"""
+"""Implementing an expiring web cache and tracker"""
 
 import requests
 import redis
@@ -40,9 +38,12 @@ def get_page(url: str) -> str:
 if __name__ == "__main__":
     # Example usage
     url = "http://slowwly.robertomurray.co.uk/delay/3000/url/http://www.example.com"
-    print(get_page(url))  # First request, should fetch from server
-    print(get_page(url))  # Second request, should fetch from cache
-    print(get_page(url))  # Third request, should fetch from cache
+    content1 = get_page(url)  # First request, should fetch from server
+    print(content1)
+    content2 = get_page(url)  # Second request, should fetch from cache
+    print(content2)
+    content3 = get_page(url)  # Third request, should fetch from cache
+    print(content3)
 
     # Output the count of requests for the URL
     print(_redis.get(f"count:{url}").decode('utf-8'))
