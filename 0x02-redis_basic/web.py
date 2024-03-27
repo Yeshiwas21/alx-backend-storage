@@ -41,6 +41,6 @@ def get_page(url: str) -> str:
 get_page = functools.lru_cache(maxsize=1, typed=False, timeout=10)(get_page)
 
 url = "http://slowwly.robertomurray.co.uk/delay/3000/url/http://www.example.com"
-print(get_page(url))
-print(get_page(url))
-print(get_page(url))
+print(get_page(url))  # First request, should fetch from server
+print(get_page(url))  # Second request, should fetch from cache
+print(get_page(url))  # Third request, should fetch from cache
