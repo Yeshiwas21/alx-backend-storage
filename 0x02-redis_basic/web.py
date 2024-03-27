@@ -1,45 +1,104 @@
 #!/usr/bin/env python3
-"""Implementing an expiring web cache and tracker"""
+
+"""
+web.py: Module for implementing an expiring web cache and tracker using Redis.
+"""
+
 import requests
 import redis
+import time
 from functools import wraps
 from typing import Callable
-import functools
+
+# Connect to Redis
+r = redis.Redis()
 
 
-_redis = redis.Redis()
+def get_page(url: str) -> str:
+    """
+    Fetches the HTML content of a URL.
+
+    Args:
+        url (str): The URL to fetch HTML content from.
+
+    Returns:
+        str: The HTML content of the URL.
+    """
+    # Check if the URL content is cached
+    cached_content = r.get(url)
+    if cached_content:
+        # Increment access count
+        r.incr(f"count:{url}")
+        return cached_content.decode('utf-8')
+
+    # If not cached, fetch the content
+    response = requests.get(url)
+    content = response.text
+
+    # Cache the content with expiration time of 10 seconds
+    r.setex(url, 10, content)
+
+    # Track access count
+    r.incr(f"count:{url}")
+
+    return content
 
 
-def count_request(method: Callable) -> Callable:
-    """Count number of request sent to a URL"""
+def cache_and_track(func: Callable) -> Callable:
+    """
+    Decorator function to cache and track access count of a URL.
 
-    @wraps(method)
-    def wrapper(*args, **kwargs):
-        """Wrapper function for decorator"""
-        url = str(*args)
-        _redis.incr("count:{}".format(url))
-        cache = _redis.get("count:{}".format(url))
+    Args:
+        func (Callable): The function to decorate.
 
-        if cache:
-            return cache.decode('utf-8')
-        else:
-            html = method(url)
-            _redis.setex("count:".format(url), 10, html)
-        return html
+    Returns:
+        Callable: The decorated function.
+    """
+    @wraps(func)
+    def wrapper(url: str) -> str:
+        """
+        Wrapper function to cache and track access count of a URL.
 
+        Args:
+            url (str): The URL to fetch HTML content from.
+
+        Returns:
+            str: The HTML content of the URL.
+        """
+        cached_content = r.get(url)
+        if cached_content:
+            # Increment access count
+            r.incr(f"count:{url}")
+            return cached_content.decode('utf-8')
+
+        content = func(url)
+
+        # Cache the content with expiration time of 10 seconds
+        r.setex(url, 10, content)
+
+        # Track access count
+        r.incr(f"count:{url}")
+
+        return content
     return wrapper
 
 
-@count_request
-def get_page(url: str) -> str:
-    """Obtain HTML content through URL"""
-    res = requests.get(url)
-    return res.text
+# Example usage with function
+print(get_page("http://slowwly.robertomurray.co.uk/delay/1000/url/http://www.example.com"))
 
-# Use functools.lru_cache to cache with expiration time of 10 seconds
-get_page = functools.lru_cache(maxsize=1, typed=False, timeout=10)(get_page)
 
-url = "http://slowwly.robertomurray.co.uk/delay/3000/url/http://www.example.com"
-print(get_page(url))
-print(get_page(url))
-print(get_page(url))
+# Example usage with decorator
+@cache_and_track
+def get_page_decorated(url: str) -> str:
+    """
+    Fetches the HTML content of a URL and caches it.
+
+    Args:
+        url (str): The URL to fetch HTML content from.
+
+    Returns:
+        str: The HTML content of the URL.
+    """
+    return requests.get(url).text
+
+print(get_page_decorated("http://slowwly.robertomurray.co.uk/delay/1000/url/http://www.example.com"))
