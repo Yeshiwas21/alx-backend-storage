@@ -41,3 +41,6 @@ if __name__ == "__main__":
     print(get_page(url))  # First request, should fetch from server
     print(get_page(url))  # Second request, should fetch from cache
     print(get_page(url))  # Third request, should fetch from cache
+
+    # Output the count of requests for the URL
+    print(_redis.get(f"count:{url}").decode('utf-8'))
