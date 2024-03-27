@@ -1,49 +1,36 @@
 #!/usr/bin/env python3
-"""Implementing an expiring web cache and tracker"""
-
+"""
+web cache and tracker
+"""
 import requests
 import redis
-import functools
-from typing import Callable
+from functools import wraps
 
-_redis = redis.Redis()
+store = redis.Redis()
 
 
-def count_request(method: Callable) -> Callable:
-    """Decorator to count number of requests sent to a URL"""
+def count_url_access(method):
+    """ Decorator counting how many times
+    a URL is accessed """
+    @wraps(method)
+    def wrapper(url):
+        cached_key = "cached:" + url
+        cached_data = store.get(cached_key)
+        if cached_data:
+            return cached_data.decode("utf-8")
 
-    @functools.wraps(method)
-    def wrapper(url: str) -> str:
-        """Wrapper function for decorator"""
-        _redis.incr(f"count:{url}")
-        cache = _redis.get(f"cache:{url}")
+        count_key = "count:" + url
+        html = method(url)
 
-        if cache:
-            return cache.decode('utf-8')
-        else:
-            html = method(url)
-            _redis.setex(f"cache:{url}", 10, html)
-            return html
-
+        store.incr(count_key)
+        store.set(cached_key, html)
+        store.expire(cached_key, 10)
+        return html
     return wrapper
 
 
-@count_request
+@count_url_access
 def get_page(url: str) -> str:
-    """Function to obtain HTML content through URL"""
+    """ Returns HTML content of a url """
     res = requests.get(url)
     return res.text
-
-
-if __name__ == "__main__":
-    # Example usage
-    url = "http://slowwly.robertomurray.co.uk/delay/3000/url/http://www.example.com"
-    content1 = get_page(url)  # First request, should fetch from server
-    print(content1)
-    content2 = get_page(url)  # Second request, should fetch from cache
-    print(content2)
-    content3 = get_page(url)  # Third request, should fetch from cache
-    print(content3)
-
-    # Output the count of requests for the URL
-    print(_redis.get(f"count:{url}").decode('utf-8'))
